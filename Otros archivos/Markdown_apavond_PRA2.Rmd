@@ -1,0 +1,252 @@
+<!-- R Commander Markdown Template -->
+
+Práctica 2: Limpieza y validación de los datos
+=======================
+
+### Realizado por Álvaro Pavón Díaz (apavond)
+
+
+```{r echo=FALSE}
+# include this code chunk as-is to set options
+knitr::opts_chunk$set(comment=NA, prompt=TRUE, out.width=750, fig.height=8, fig.width=8)
+library(Rcmdr)
+library(car)
+library(RcmdrMisc)
+```
+
+
+```{r echo=FALSE}
+# include this code chunk as-is to enable 3D graphs
+library(rgl)
+knitr::knit_hooks$set(webgl = hook_webgl)
+```
+
+# 1. Intencionalidad del conjunto de datos
+La práctica va a ser realizada en el entorno estadístico R.
+<br>
+El dataset que vamos a utilizar en el desarrollo de la práctica contiene datos sobre los pasajeros del Titanic. 
+El objetivo de la práctica es decidir si los factores personales y ecónomicos influyeron en la supervivencia de 
+ellos y la creación de modelos para predecir si una persona que no estaba en el barco en el momento del hundimiento 
+hubiera sobrevivido. Este conjunto de datos esta alojado el la página kaggle en el siguiente enlace: 
+<a href="https://www.kaggle.com/c/titanic">https://www.kaggle.com/c/titanic</a>
+<br> Pasamos a importar el archivo con extensión csv llamado train:
+```{r}
+Dataset <- 
+  
+  read.table("F:/Google Drive/Master cuatrimeste 1 de 1819/Tipologia y Ciclo de Vida de los datos/PRA2/all/train.csv",
+  
+   header=TRUE, sep=",", na.strings="NA", dec=".", strip.white=TRUE)
+```
+
+# 2. Descripción del conjunto de datos
+
+El cojunto de datos que analizaremos a lo largo de esta práctica consta de 10 atributos y con 891 registros. Vamos 
+a describir los diferentes campos:
+<ul>
+	<li><b>PasangerId</b>: nos indica el número de registro en el que estamos.</li>
+	<li><b>Suvirved</b>: si el pasajero sobrevive como 1 y si el pasajero no sobrevive como 0.</li>
+	<li><b>Pclase</b>: con un número nos indica si el pasaje era de primera, segunda o tercera clase.</li>
+	<li><b>Name</b>: nombre del pasajero.</li>
+	<li><b>Sex</b>: con dos palabras define el sexo del pasajero male para hombre y female para mujer</li>
+	<li><b>Age</b>: edad del pasajero en años</li>
+	<li><b>Sibsp</b>: el número de hermanos y conyuges abordos del Titanic.</li>
+	<li><b>Parch</b>: el número de padres e hihos abordos del Titanic.</li>
+	<li><b>Ticket</b>: identificador alfanumérico del ticket con el que embarcaron.</li>
+	<li><b>Fare</b>: precio del ticket.</li>
+	<li><b>Cabin</b>: identificador alfanumérico de la cabina.</li>
+	<li><b>Embarked</b>: puerto de embarcación del pasajero identificado con una letra. 
+Siendo C para Cherbourg, Q para Queenstown y S para Southampton</li>
+</ul>
+Veamos un resumen de los datos que se encuentran en el conjunto de datos:
+
+```{r}
+summary(Dataset)
+```
+
+# 3. Limpieza de los datos.
+
+Vamos a comenzar viendo la clase que tienen tras la importación del conjunto de datos:
+
+```{r}
+sapply( Dataset, class)
+```
+
+Para el futuro estudio de los datos en R los atributos Survived y Pclass vamos a pasarlas de integer a factor. 
+Las añadiremos en nuevos atributosdentro del data.frame que ya teníamoos creados.
+
+```{r}
+Dataset <- within(Dataset, {
+  SurvivedF <- as.factor(Survived)
+})
+Dataset <- within(Dataset, {
+  PclassF <- as.factor(Pclass)
+})
+```
+Eliminaremos los atributos:
+<ul>
+	<li><b>PasangerId</b>: por ser el número de la fila no nos aporta nada.</li>
+	<li><b>Survived</b>: se pasa a factor como SurvivedF</li>
+	<li><b>Pclass</b>: se pasa a factor como PclassF</li>
+	<li><b>Name</b>: no aporta nada estadísticamente hablando</li>
+	<li><b>Ticket</b>: el identificador del ticket no nos dice nada.</li>
+	<li><b>Cabin</b>: Tampoco es interesante por la cantidad de campos vacíos.</li>
+</ul>
+```{r}
+Dataset<-Dataset[, -(1:4)]
+Dataset<-Dataset[, -(5:5)]
+Dataset<-Dataset[, -(6:6)]
+```
+
+Vamos a analizar los elementos vacíos que nos encontramos: 
+
+```{r}
+sapply(Dataset, function(x) sum(is.na(x)))
+```
+Se da la situación de que tenemos 177 elementos con vacíos en el atributo Age. Se va a dejar como elementos nulos. 
+Si hubieran sido menos se hubiera intentado rellenarlos con algún método, como podría haber sido el método de los 
+vecinos más próximos.
+<br> Vimos en el resumen que había otro elemento de los que quedan que tiene elementos nulos. Es Embarked. Pero no
+lo contabiliza por ser '' y NA. Así que generaremos una función para contarlas. Que serán 2 y posteriormente se 
+eliminarán tanto los registro como el level del factor Embarked.
+
+```{r}
+stringEmptyEmbarked <- function (x){
+	result<-0
+	if (x==''|| x==Dataset[62,'Embarked']){
+	 result<-result+1
+	}
+	return(result)
+}
+sum(sapply( Dataset[,'Embarked'], stringEmptyEmbarked))
+Dataset <- Dataset[Dataset$Embarked != Dataset[62,'Embarked'],]
+Dataset$Embarked <- Dataset$Embarked[, drop=TRUE]
+```
+
+Veamos los diagramas de cajas de los atributos numéricos :
+
+```{r}
+Boxplot( ~ Age, data=Dataset, id=list(method="y"))
+
+Boxplot( ~ SibSp, data=Dataset, id=list(method="y"))
+
+Boxplot( ~ Parch, data=Dataset, id=list(method="y"))
+
+Boxplot( ~ Fare, data=Dataset, id=list(method="y"))
+```
+
+Ahora veamos los elementos que se quedan fuera de los diagramans de cajas.
+
+```{r}
+boxplot.stats(Dataset$Age)$out
+boxplot.stats(Dataset$SibSp)$out
+boxplot.stats(Dataset$Parch)$out
+boxplot.stats(Dataset$Fare)$out
+```
+A pesar de que puedan parecer muchos los elementos que quedan fueras de los diagramas de caja no parecen que sean 
+datos que esten fuera de rango según los datos analizados.
+<br>Para finalizar el estudio de la limpieza de datos veamos el resumende como han quedado los datos del conjunto 
+de datos y exportemos el archivo limpio <b>como Titanic_clean.csv</b>.
+
+
+```{r}
+summary(Dataset)
+write.csv(Dataset, "Titanic_clean.csv")
+```
+
+# 4. Análisis de los datos
+
+El conjunto de los datos que nos queda se puede dividir por según tres criterios: por si sobrevivieron, por la 
+clase en la que viajaban y por el lugar donde embarcaron. Aunque en la práctiva solo nos centraremos en el primer 
+grupo que se puede agrupar de la siguiente forma:
+
+
+```{r}
+sobreviven <- Dataset[Dataset$SurvivedF == "0",]
+mueren <- Dataset[Dataset$SurvivedF == "1",]
+```
+
+Vamos a comprobar la normalidad de los atributos numéricos por medio de la prueba de normalidad de 
+Anderson-Darling. Los siguientes atributos según esta prueba y un nivel de significacion de &alpha; = 0,05 
+no siguen una distribución normal:
+
+```{r}
+library(nortest)
+alpha = 0.05
+col.names = colnames(Dataset)
+for (i in 1:ncol(Dataset)) {
+	if (is.integer(Dataset[,i]) | is.numeric(Dataset[,i])) {
+		p_val = ad.test(Dataset[,i])$p.value
+		if (p_val < alpha) {
+			cat(col.names[i])
+			if (i < ncol(Dataset) - 1) cat(", ")
+		}
+	}
+}
+```
+
+Para comprobar la homogeneidad de las varianza se aplicara un test de Fligner-Killen. Para la relación entre 
+Age y el Fare dando que no son homogéneas porque dan de resultado un p-valor inferior al 0.05.
+
+```{r}
+fligner.test(Fare ~ Age, data = Dataset)
+```
+
+Ofreceremos ahora un estudio de diferentes posibles modelos de rregresión logística.
+
+```{r}
+modeloRLSuvirved1 <- glm(SurvivedF ~ Sex , family=binomial, data=Dataset)
+summary(modeloRLSuvirved1)
+modeloRLSuvirved2 <- glm(SurvivedF ~ Sex + PclassF + SibSp + Parch, family=binomial, data=Dataset)
+summary(modeloRLSuvirved2)
+modeloRLSuvirved3 <- glm(SurvivedF ~ Sex + PclassF + SibSp + Parch + Fare, family=binomial, data=Dataset)
+summary(modeloRLSuvirved3)
+modeloRLSuvirved4 <- glm(SurvivedF ~ Sex + PclassF + SibSp + Parch + Age, family=binomial, data=Dataset)
+summary(modeloRLSuvirved4)
+modeloRLSuvirved5 <- glm(SurvivedF ~ Sex + PclassF + SibSp + Parch + Fare + Age, family=binomial, 
+  data=Dataset)
+summary(modeloRLSuvirved5)
+```
+
+El resultado que nos arroja un mejor resultado por medio de valorar de que un modelo es mejor cuanto menor es el 
+valor AIC. En este caso es el <b>modeloRLSuvirved5</b>. Problemas que nos da este modelo, ignora los registros que 
+contine el atributo Age como NA. Los valores significativos en este modelos para un valor inferior a 0.001 son 
+Sex, PclassF y Age.
+<br>Veamos como predice alguno de los elementos del test:
+
+```{r}
+pred1 <- data.frame(SuvirvedF=0, Sex='male', PclassF="3", SibSp=0, Parch=0, Age=34.5)
+predict(modeloRLSuvirved4, pred1, type= "response")
+pred2 <- data.frame(SuvirvedF='1', Sex='female', PclassF='3' , SibSp=1, Parch=0, Age=47)
+predict(modeloRLSuvirved4, pred2, type= "response")
+pred3 <- data.frame(SuvirvedF='0', Sex='male', PclassF='2' , SibSp=0, Parch=0, Age=62)
+predict(modeloRLSuvirved4, pred3, type= "response")
+```
+
+En este caso predice en los tres casos que fallece las personas en caso de tomar que solo sobrevive si el 
+resultado es superior a 0.7.
+<br> Veamos la calidad del ajuste por medio de la matriz de confusión. Hay 129 falsos positivos que han 
+muerto pero estan vivas, pero se consideran como vivos. Hay falsos negativos 15 que estaban vivas pero 
+se han considerado muertas. Es bueno que los falsos negativos sea bastante mas reducido que los falsos 
+positivos.
+
+```{r}
+prob_Survived <- predict(modeloRLSuvirved4, Dataset, type="response")
+pred_Survived <- ifelse(prob_Survived > 0.70,1,0)
+table (Dataset$SurvivedF, pred_Survived)
+```
+
+Valoremos por otro lado la calidad del ajuste por medio de la curva ROC, como da un valor de AUC de 0.858 
+tiene un buen valor predictivo según esta curva.
+
+```{r}
+library(pROC)
+rocSuvirved <- with(Dataset,roc(Dataset$SurvivedF,prob_Survived))
+plot(rocSuvirved, col="red", print.auc=TRUE)
+```
+
+# 5. Conclusiones
+
+Se puede definir un modelo a través de los datos del hundimiento para determinar las posibilidades de sobrevivir 
+en una catastrofe de las dimensiones similares. Cuales son las variables de una personas son mas significativas a 
+la hora de sobrevivir y hacer predicciones que pueden ayudar a la hora de fijar tarifas por según las 
+carácterísticas de los individuos que suelen viajar en los transportes.
